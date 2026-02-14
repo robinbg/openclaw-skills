@@ -1,0 +1,90 @@
+# OpenClaw Skills 设计规范
+
+本文档记录 OpenClaw Skills 集合的设计决策、技术规范和实现细节。
+
+## 1. 概述
+
+OpenClaw Skills 是一组帮助开发者快速构建 OpenClaw 集成应用的工具，遵循 Claude Code skills 规范。结构参考 Mindverse 的 Second-Me-Skills。
+
+## 2. 技能清单
+
+| 技能名 | 用途 | 状态文件 |
+|--------|------|----------|
+| `openclaw` | 一站式生成（init → prd → nextjs） | `.openclaw/state.json` |
+| `openclaw-init` | 项目配置初始化 | `.openclaw/state.json` |
+| `openclaw-prd` | 产品需求对话定义 | `.openclaw/state.json` 的 `prd` 字段 |
+| `openclaw-nextjs` | 基于配置生成 Next.js 项目 | 读取 `.openclaw/state.json` |
+| `openclaw-reference` | API 技术参考（静态文档） | 无状态 |
+
+## 3. 状态文件规范
+
+路径：`.openclaw/state.json`
+
+结构：
+
+```json
+{
+  "version": "1.0",
+  "stage": "init | prd | ready",
+  "project": {
+    "name": "kebab-case",
+    "description": "...",
+    "author": "..."
+  },
+  "config": {
+    "gateway_url": "http://localhost:18789",
+    "gateway_token": "string or null"
+  },
+  "modules": {
+    "skill": true,
+    "plugin": false,
+    "web": true,
+    "oauth": false,
+    "database": "none | postgresql | sqlite"
+  },
+  "prd": {
+    "summary": "...",
+    "features": [...],
+    "target_users": "...",
+    "design_preference": "...",
+    "tech_stack": "nextjs | vite-react"
+  },
+  "docs": {
+    "openclaw_docs": "https://docs.openclaw.ai",
+    "api_reference": "https://docs.openclaw.ai/api",
+    "github": "https://github.com/openclaw/openclaw"
+  }
+}
+```
+
+## 4. 工作流
+
+- **一站式模式**：`/openclaw` 自动完成全部流程。
+- **分步模式**：先 `/openclaw-init`，再 `/openclaw-prd`，最后 `/openclaw-nextjs`。
+
+## 5. 技术栈（Next.js 模板）
+
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS
+- Prisma + PostgreSQL/SQLite（可选）
+- NextAuth（OAuth 可选）
+
+## 6. 设计原则
+
+- 亮色主题、简约优雅、响应式
+- 中文界面
+- 默认安全配置
+
+## 7. 版本与更新
+
+- Skills 版本由各自 SKILL.md 定义（不需要 `package.json`）。
+- 用户通过 `skills add <repo>` 安装集合。
+- 上游更新通过 `skills upgrade` 分发。
+
+## 8. 待办与变更
+
+- [ ] 补充 `openclaw-plugin` 模板生成
+- [ ] 添加 GitHub Actions 自动发布标记
+- [ ] 增加单元测试和集成测试示例
+- [ ] 文档补充更多实际使用案例

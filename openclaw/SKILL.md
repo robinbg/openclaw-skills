@@ -1,5 +1,5 @@
 ---
-name: openclaw-app
+name: openclaw
 description: 一站式生成 OpenClaw 项目（Skill、Plugin、Web应用），交互式配置并自动生成项目骨架
 user-invocable: true
 argument-hint: [--type <skill|plugin|web>] [--quick] [--output <dir>]
