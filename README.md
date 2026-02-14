@@ -53,14 +53,14 @@ openclaw-skills/
 ├── LICENSE                             # MIT 许可证
 ├── .gitignore                          # Git 忽略文件
 └── specs/                              # 设计规范文档
-    └── 001-openclaw-skills-design/
-        └── README.md                   # 设计规范
-└── skills/
+│   └── 001-openclaw-skills-design/
+│       └── README.md                   # 设计规范
+└── skills/                             # 所有技能位于此目录下
     ├── openclaw/
     │   ├── SKILL.md                    # 一站式生成器
     │   └── scripts/
-    │       └── init_app.py             # 主生成逻辑
-    │       └── package_app.py          # 打包脚本
+    │       ├── init_app.py             # 主生成逻辑
+    │       ├── package_app.py          # 打包脚本
     │       └── validate.py             # 验证脚本
     │       └── templates/              # 项目模板
     │           ├── skill/
@@ -77,7 +77,7 @@ openclaw-skills/
     ├── openclaw-nextjs/
     │   ├── SKILL.md                    # Next.js 生成
     │   └── scripts/
-    │       └── generate_nextjs.py      # 项目生成脚本
+    │       └── generate_nextjs.py      # 项目生成脚本（支持 Next.js 和 Vite+React）
     └── openclaw-reference/
         ├── SKILL.md                    # API 参考
         └── scripts/
