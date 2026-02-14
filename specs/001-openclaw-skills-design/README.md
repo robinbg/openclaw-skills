@@ -73,6 +73,7 @@ OpenClaw Skills 是一组帮助开发者快速构建 OpenClaw 集成应用的工
 - Tailwind CSS
 - Prisma + PostgreSQL/SQLite（可选）
 - NextAuth（OAuth 可选）
+- Web 首页包含“连接到 OpenClaw”指南
 
 ### Vite + React 栈
 
@@ -81,6 +82,7 @@ OpenClaw Skills 是一组帮助开发者快速构建 OpenClaw 集成应用的工
 - 可选：Tailwind CSS 可通过用户手动添加
 - Prisma + PostgreSQL（可选）
 - 自定义 OAuth 实现（示例提供基础封装）
+- Web 首页包含“连接到 OpenClaw”指南
 
 ## 6. 设计原则
 

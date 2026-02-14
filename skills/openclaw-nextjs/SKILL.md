@@ -226,3 +226,48 @@ Next.js 默认使用端口 3000，请确保该端口未被占用。
 | OpenClaw 文档 | `docs.openclaw_docs` |
 | API 参考 | `docs.api_reference` |
 | GitHub 仓库 | `docs.github` |
+
+---
+
+## 技术栈选项
+
+通过 PRD 中的 `tech_stack` 字段选择：
+
+- `nextjs` (默认) - Next.js 14 (App Router) + Tailwind CSS
+- `vite-react` - Vite 5 + React 18 + TypeScript
+
+两种栈均包含 OpenClaw HTTP API 客户端封装（`src/lib/openclaw.ts` 或 `src/openclaw.ts`），以及 `/api/openclaw` 代理路由（Next.js）或直接调用（Vite）。
+
+---
+
+## Web 首页连接指南
+
+生成的 Web 应用首页包含显著的 **🔌 连接到 OpenClaw** 区块，说明：
+
+1. 启动 OpenClaw Gateway（默认 `http://localhost:18789`）
+2. 安装并启用对应的 Skill（`npx skills add robinbg/openclaw-skills` 或手动复制 `skills/` 目录）
+3. 在 `.env.local` 中配置 `OPENCLAW_GATEWAY_URL` 和 `OPENCLAW_GATEWAY_TOKEN`
+4. 重启 Web 应用，即可通过 Agent 调用 OpenClaw 能力
+
+此指南旨在帮助人类用户快速将 Web 应用与自己的 OpenClaw 实例连接。
+
+---
+
+## 输出结构示例（Next.js）
+
+```
+my-app/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx      # 首页（含连接指南）
+│   │   ├── layout.tsx
+│   │   ├── globals.css
+│   │   └── api/openclaw/route.ts  # 代理到 Gateway
+│   └── lib/openclaw.ts   # API 封装
+├── .env.local.example
+├── package.json
+├── README.md             # 包含 Skill 安装说明
+└── ...
+```
+
+Vite 项目结构略有不同，但功能对等。

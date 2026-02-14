@@ -9,7 +9,7 @@
 | `/openclaw` | 一站式生成项目（包含 init、prd、nextjs） |
 | `/openclaw-init` | 初始化 OpenClaw 项目配置和功能模块选择 |
 | `/openclaw-prd` | 通过对话定义 OpenClaw 项目的产品需求 |
-| `/openclaw-nextjs` | 基于配置和需求生成 Next.js 全栈项目 |
+| `/openclaw-nextjs` | 基于配置生成 Web 项目（Next.js 或 Vite+React） |
 | `/openclaw-reference` | OpenClaw API 完整技术参考文档 |
 
 ## 安装方式

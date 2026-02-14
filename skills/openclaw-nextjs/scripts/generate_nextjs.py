@@ -37,7 +37,7 @@ def normalize_name(raw):
 def title_case(name):
     return " ".join(w.capitalize() for w in name.split("-"))
 
-def generate_nextjs(project_dir, project_name, desc, modules, config):
+def generate_nextjs(project_dir, project_name, desc, modules, config, state):
     # package.json
     pkg = {
         "name": project_name,
@@ -58,9 +58,9 @@ def generate_nextjs(project_dir, project_name, desc, modules, config):
         pkg["scripts"]["db:push"] = "prisma db push"
     if modules.get("oauth"):
         pkg["dependencies"]["next-auth"] = "^4"
-    (project_dir / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
+    write_file(project_dir / "package.json", json.dumps(pkg, indent=2) + "\n")
 
-    (project_dir / "tsconfig.json").write_text("""{
+    write_file(project_dir / "tsconfig.json", """{
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -83,7 +83,7 @@ def generate_nextjs(project_dir, project_name, desc, modules, config):
 }
 """)
 
-    (project_dir / "next.config.js").write_text("""/** @type {import('next').NextConfig} */
+    write_file(project_dir / "next.config.js", """/** @type {import('next').NextConfig} */
 const nextConfig = { env: { OPENCLAW_GATEWAY_URL: process.env.OPENCLAW_GATEWAY_URL } };
 module.exports = nextConfig;
 """)
@@ -99,33 +99,61 @@ module.exports = nextConfig;
     ]
     if modules.get("oauth"):
         env += ["# OAuth", "NEXTAUTH_URL=http://localhost:3000", "NEXTAUTH_SECRET=change-me", "OAUTH_CLIENT_ID=your-client-id", "OAUTH_CLIENT_SECRET=your-client-secret"]
-    (project_dir / ".env.local.example").write_text("\n".join(env) + "\n")
+    write_file(project_dir / ".env.local.example", "\n".join(env) + "\n")
 
     app_dir = project_dir / "src" / "app"
     ensure_dir(app_dir / "api" / "openclaw")
-    (app_dir / "layout.tsx").write_text("""import './globals.css';
+    write_file(app_dir / "layout.tsx", """import './globals.css';
 import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin'] });
 export const metadata = { title: 'OpenClaw App', description: 'OpenClaw integrated application' };
-export default function RootLayout({ children }) { return (<html lang=\"zh-CN\"><body className={inter.className}>{children}</body></html>); }
+export default function RootLayout({ children }) { return (<html lang="zh-CN"><body className={inter.className}>{children}</body></html>); }
 """)
-    (app_dir / "globals.css").write_text("* { box-sizing: border-box; } body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }")
+    write_file(app_dir / "globals.css", "* { box-sizing: border-box; } body { margin: 0; padding: 0; font-family: system-ui, sans-serif; }")
+
     summary = state.get("prd", {}).get("summary", desc)
-    features = "\n".join([f"      <li>{f}</li>" for f in state.get("prd", {}).get("features", [])])
-    features_html = f"\n      <h2>核心功能</h2>\n      <ul>{features}</ul>\n" if features else ""
-    (app_dir / "page.tsx").write_text(f"""import {{ React }} from 'react';
+    features_list = state.get("prd", {}).get("features", [])
+    features_html = ""
+    if features_list:
+        items = "\n".join([f"        <li>{f}</li>" for f in features_list])
+        features_html = f"""
+      <section>
+        <h2>核心功能</h2>
+        <ul>{items}</ul>
+      </section>
+"""
+    # Connection guide section
+    skill_name = state["project"]["name"]
+    connect_guide = f"""
+      <section style={{ background: '#f6f8fa', padding: '1.5rem', borderRadius: '8px', marginTop: '2rem' }}>
+        <h2>🔌 连接到 OpenClaw</h2>
+        <p>本应用用于访问 OpenClaw Gateway。按照以下步骤连接：</p>
+        <ol>
+          <li>确保 OpenClaw Gateway 正在运行（默认 <code>http://localhost:18789</code>）。</li>
+          <li>在 OpenClaw 中安装对应的 Skill：<br />
+            <code>npx skills add robinbg/openclaw-skills</code> 或手动复制 <code>skills/</code> 目录到你的 OpenClaw 工作区。</li>
+          <li>在 OpenClaw Gateway 中启用该 Skill。</li>
+          <li>在本应用的 <code>.env.local</code> 中配置 <code>OPENCLAW_GATEWAY_URL</code> 和 <code>OPENCLAW_GATEWAY_TOKEN</code>（如需认证）。</li>
+          <li>重启本应用，即可通过 Agent 调用 OpenClaw 能力。</li>
+        </ol>
+        <p>更多信息请参考 <a href="https://docs.openclaw.ai">OpenClaw 文档</a>。</p>
+      </section>
+"""
+    write_file(app_dir / "page.tsx", f"""import {{ React }} from 'react';
 export default function Home() {{
   return (
     <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       <h1>{title_case(project_name)}</h1>
-      <p>{summary}</p>{features_html}
-      <p>基于 OpenClaw 构建</p>
+      <p>{summary}</p>
+{features_html}
+{connect_guide}
     </main>
   );
 }}
 """)
-    (project_dir / "src" / "lib" / "openclaw.ts").parent.mkdir(parents=True, exist_ok=True)
-    (project_dir / "src" / "lib" / "openclaw.ts").write_text("""// OpenClaw API wrapper
+
+    write_file(project_dir / "src" / "lib" / "openclaw.ts").parent.mkdir(parents=True, exist_ok=True)
+    write_file(project_dir / "src" / "lib" / "openclaw.ts", """// OpenClaw API wrapper
 const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789';
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
 export async function callOpenClaw(messages, agentId = 'main') {
@@ -133,43 +161,44 @@ export async function callOpenClaw(messages, agentId = 'main') {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(GATEWAY_TOKEN && {{ 'Authorization': `Bearer ${{GATEWAY_TOKEN}}` }),
+      ...(GATEWAY_TOKEN && { 'Authorization': `Bearer ${GATEWAY_TOKEN}` }),
       'x-openclaw-agent-id': agentId,
     },
-    body: JSON.stringify({{ model: `openclaw:${{agentId}}`, messages }}),
+    body: JSON.stringify({ model: `openclaw:${agentId}`, messages }),
   });
-  if (!response.ok) {{ const text = await response.text(); throw new Error(`OpenClaw API error: ${{response.status}} ${{text}}`); }}
+  if (!response.ok) { const text = await response.text(); throw new Error(`OpenClaw API error: ${response.status} ${text}`); }
   return response.json();
 }
 export {{ callOpenClaw }};
 """)
-    (app_dir / "api" / "openclaw" / "route.ts").write_text("""import { NextResponse } from 'next/server';
+
+    write_file(app_dir / "api" / "openclaw" / "route.ts", """import { NextResponse } from 'next/server';
 const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL;
 export async function POST(request) {
-  try {{
-    if (!GATEWAY_URL) {{ return NextResponse.json({{ error: 'OPENCLAW_GATEWAY_URL not configured' }}, {{ status: 500 }}); }}
+  try {
+    if (!GATEWAY_URL) { return NextResponse.json({ error: 'OPENCLAW_GATEWAY_URL not configured' }, { status: 500 }); }
     const body = await request.json();
-    const response = await fetch(GATEWAY_URL + '/v1/chat/completions', {{
+    const response = await fetch(GATEWAY_URL + '/v1/chat/completions', {
       method: 'POST',
-      headers: {{ 'Content-Type': 'application/json' }},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }});
+    });
     const data = await response.json();
-    return NextResponse.json(data, {{ status: response.status }});
-  }} catch (error) {{
-    return NextResponse.json({{ error: error.message }}, {{ status: 500 }});
-  }}
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 """)
 
     if modules.get("database") == "postgresql":
         prisma_dir = project_dir / "prisma"
         ensure_dir(prisma_dir)
-        (prisma_dir / "schema.prisma").write_text("""generator client { provider = "prisma-client-js" }
+        write_file(prisma_dir / "schema.prisma", """generator client { provider = "prisma-client-js" }
 datasource db { provider = "postgresql", url = env("DATABASE_URL") }
 model UserSession { id String @id @default(cuid()) userId String sessionId String @unique title String? messagesJson String createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([userId]) @@index([createdAt]) }
 """)
-        (project_dir / ".env.local.example").write_text((project_dir / ".env.local.example").read_text() + "\nDATABASE_URL=postgresql://user:password@localhost:5432/dbname\n")
+        write_file(project_dir / ".env.local.example", (project_dir / ".env.local.example").read_text() + "\nDATABASE_URL=postgresql://user:password@localhost:5432/dbname\n")
 
     readme = f"""# {title_case(project_name)}
 
@@ -217,6 +246,25 @@ model UserSession { id String @id @default(cuid()) userId String sessionId Strin
 | `NEXT_PUBLIC_APP_NAME` | 应用名称 |
 | `DATABASE_URL` | PostgreSQL/SQLite 连接串（如启用数据库） |
 
+## 对应的 Skill
+
+此 Web 应用配套的 Skill 位于生成的 `skill/` 目录中，可将整个 `skill/` 文件夹复制到你的 OpenClaw 工作区并安装。
+
+### 安装 Skill
+
+```bash
+# 方式1: 使用 skills 工具
+npx skills add robinbg/openclaw-skills
+
+# 方式2: 手动复制
+cp -r skill/ ~/.openclaw/workspace/skills/
+# 重启 OpenClaw Gateway
+```
+
+### 启用 Skill
+
+在 OpenClaw Gateway 配置中启用该 Skill，然后即可在 Agent 对话中调用。
+
 ## 开发说明
 
 - 使用 `src/lib/openclaw.ts` 中的 `callOpenClaw` 函数调用 Gateway
@@ -227,7 +275,7 @@ model UserSession { id String @id @default(cuid()) userId String sessionId Strin
 
 部署到 Vercel、Netlify 或任何 Node.js 主机时，请确保设置所需的环境变量。
 """
-    (project_dir / "README.md").write_text(readme)
+    write_file(project_dir / "README.md", readme)
 
 def generate_vite_react(project_dir, project_name, desc, modules, config):
     # package.json for Vite + React + TypeScript
@@ -257,10 +305,10 @@ def generate_vite_react(project_dir, project_name, desc, modules, config):
     if modules.get("oauth"):
         pkg["dependencies"]["@auth/core"] = "^0.18"
         pkg["dependencies"]["@auth/react-query"] = "^0.18"
-    (project_dir / "package.json").write_text(json.dumps({k: v for k, v in pkg.items() if v is not None}, indent=2) + "\n")
+    write_file(project_dir / "package.json", json.dumps({k: v for k, v in pkg.items() if v is not None}, indent=2) + "\n")
 
     # tsconfig.json for Vite
-    (project_dir / "tsconfig.json").write_text("""{
+    write_file(project_dir / "tsconfig.json", """{
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
@@ -282,14 +330,14 @@ def generate_vite_react(project_dir, project_name, desc, modules, config):
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 """)
-    (project_dir / "tsconfig.node.json").write_text("""{
+    write_file(project_dir / "tsconfig.node.json", """{
   "compilerOptions": { "composite": true, "skipLibCheck": true, "module": "ESNext", "moduleResolution": "bundler", "allowSyntheticDefaultImports": true, "strict": true },
   "include": ["vite.config.ts"]
 }
 """)
 
     # vite.config.ts
-    (project_dir / "vite.config.ts").write_text("""import { defineConfig } from 'vite';
+    write_file(project_dir / "vite.config.ts", """import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
@@ -309,18 +357,46 @@ export default defineConfig({
     ]
     if modules.get("oauth"):
         env += ["# OAuth", "VITE_AUTH_REDIRECT_URI=http://localhost:3000/callback", "OAUTH_CLIENT_ID=your-client-id", "OAUTH_CLIENT_SECRET=your-client-secret"]
-    (project_dir / ".env.local.example").write_text("\n".join(env) + "\n")
+    write_file(project_dir / ".env.local.example", "\n".join(env) + "\n")
 
     # src directory
     src_dir = project_dir / "src"
     ensure_dir(src_dir)
-    (src_dir / "main.tsx").write_text("""import React from 'react';
+    write_file(src_dir / "main.tsx", """import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
 """)
-    (src_dir / "App.tsx").write_text(f"""import React from 'react';
+    summary = state.get("prd", {}).get("summary", desc)
+    features_list = state.get("prd", {}).get("features", [])
+    features_html = ""
+    if features_list:
+        items = "\n    ".join([f"<li>{f}</li>" for f in features_list])
+        features_html = f"""
+      <section>
+        <h2>核心功能</h2>
+        <ul>
+          {items}
+        </ul>
+      </section>
+"""
+    connect_guide = f"""
+      <section style={{ background: '#f6f8fa', padding: '1.5rem', borderRadius: '8px', marginTop: '2rem' }}>
+        <h2>🔌 连接到 OpenClaw</h2>
+        <p>本应用用于访问 OpenClaw Gateway。按照以下步骤连接：</p>
+        <ol>
+          <li>确保 OpenClaw Gateway 正在运行（默认 <code>http://localhost:18789</code>）。</li>
+          <li>在 OpenClaw 中安装对应的 Skill：<br />
+            <code>npx skills add robinbg/openclaw-skills</code> 或手动复制 <code>skills/</code> 目录到你的 OpenClaw 工作区。</li>
+          <li>在 OpenClaw Gateway 中启用该 Skill。</li>
+          <li>在本应用的 <code>.env.local</code> 中配置 <code>VITE_OPENCLAW_GATEWAY_URL</code> 和 <code>VITE_OPENCLAW_GATEWAY_TOKEN</code>（如需认证）。</li>
+          <li>重启本应用，即可通过 Agent 调用 OpenClaw 能力。</li>
+        </ol>
+        <p>更多信息请参考 <a href="https://docs.openclaw.ai">OpenClaw 文档</a>。</p>
+      </section>
+"""
+    write_file(src_dir / "App.tsx", f"""import React from 'react';
 import {{ openclaw }} from './openclaw';
 
 function App() {{
@@ -335,7 +411,7 @@ function App() {{
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h1>{title_case(project_name)}</h1>
-      <p>{desc}</p>
+      <p>{desc}</p>{features_html}{connect_guide}
       <input value={{input}} onInput={{e => setInput(e.currentTarget.value)}} placeholder="输入消息..." style={{ width: '80%', padding: 8 }} />
       <button onClick={{handleSend}} style={{ marginLeft: 8 }}>发送</button>
       <div style={{ marginTop: 20 }}>{{reply && <><strong>回复：</strong>{{reply}}</>}}</div>
@@ -344,33 +420,33 @@ function App() {{
 }}
 export default App;
 """)
-    (src_dir / "openclaw.ts").write_text("""// OpenClaw API wrapper for Vite
+    write_file(src_dir / "openclaw.ts", """// OpenClaw API wrapper for Vite
 const GATEWAY_URL = import.meta.env.VITE_OPENCLAW_GATEWAY_URL || 'http://localhost:18789';
 const GATEWAY_TOKEN = import.meta.env.VITE_OPENCLAW_GATEWAY_TOKEN;
 
-export const openclaw = {{
-  async call(message) {{
-    const response = await fetch(GATEWAY_URL + '/v1/chat/completions', {{
+export const openclaw = {
+  async call(message) {
+    const response = await fetch(GATEWAY_URL + '/v1/chat/completions', {
       method: 'POST',
-      headers: {{
+      headers: {
         'Content-Type': 'application/json',
-        ...(GATEWAY_TOKEN && {{ 'Authorization': `Bearer ${{GATEWAY_TOKEN}}` }}),
+        ...(GATEWAY_TOKEN && { 'Authorization': `Bearer ${GATEWAY_TOKEN}` }),
         'x-openclaw-agent-id': 'main',
-      }},
-      body: JSON.stringify({{
+      },
+      body: JSON.stringify({
         model: 'openclaw:main',
         messages: [message],
-      }}),
-    }});
+      }),
+    });
     const data = await response.json();
-    return data.choices?.[0]?.message || {{ content: 'Error' }};
-  }},
+    return data.choices?.[0]?.message || { content: 'Error' };
+  },
 };
 """)
-    (src_dir / "index.css").write_text("""body { margin: 0; font-family: system-ui, sans-serif; background: #f9f9f9; }
+    write_file(src_dir / "index.css", """body { margin: 0; font-family: system-ui, sans-serif; background: #f9f9f9; }
 input, button {{ font-size: 16px; }}
 """)
-    (project_dir / "index.html").write_text("""<!DOCTYPE html>
+    write_file(project_dir / "index.html", """<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -387,13 +463,13 @@ input, button {{ font-size: 16px; }}
     if modules.get("database") == "postgresql":
         prisma_dir = project_dir / "prisma"
         ensure_dir(prisma_dir)
-        (prisma_dir / "schema.prisma").write_text("""generator client { provider = "prisma-client-js" }
+        write_file(prisma_dir / "schema.prisma", """generator client { provider = "prisma-client-js" }
 datasource db { provider = "postgresql", url = env("DATABASE_URL") }
 model UserSession { id String @id @default(cuid()) userId String sessionId String @unique title String? messagesJson String createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([userId]) @@index([createdAt]) }
 """)
-        (project_dir / ".env.local.example").write_text((project_dir / ".env.local.example").read_text() + "\nDATABASE_URL=postgresql://user:password@localhost:5432/dbname\n")
+        write_file(project_dir / ".env.local.example", (project_dir / ".env.local.example").read_text() + "\nDATABASE_URL=postgresql://user:password@localhost:5432/dbname\n")
 
-    (project_dir / "README.md").write_text(f"""# {title_case(project_name)}
+    write_file(project_dir / "README.md", f"""# {title_case(project_name)}
 
 {desc}
 
@@ -445,7 +521,7 @@ def main():
     print(f"生成 {{'Next.js' if tech == 'nextjs' else 'Vite+React'}} 项目...")
 
     if tech == "nextjs":
-        generate_nextjs(project_dir, project_name, proj.get("description", "OpenClaw 项目"), modules, config)
+        generate_nextjs(project_dir, project_name, proj.get("description", "OpenClaw 项目"), modules, config, state)
     else:
         generate_vite_react(project_dir, project_name, proj.get("description", "OpenClaw 项目"), modules, config)
 
