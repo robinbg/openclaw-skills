@@ -25,6 +25,10 @@ def load_state(root):
     except:
         return None
 
+def save_state(root, state):
+    sp = Path(root) / STATE_FILE
+    sp.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+
 def ensure_dir(p):
     Path(p).mkdir(parents=True, exist_ok=True)
 
@@ -37,18 +41,62 @@ def normalize_name(raw):
 def title_case(name):
     return " ".join(w.capitalize() for w in name.split("-"))
 
+def generate_skill(project_dir, project_name, desc, state):
+    skill_dir = project_dir / "skill"
+    ensure_dir(skill_dir)
+    skill_name = f"{project_name}-skill"
+    skill_desc = f"Skill for {project_name} OpenClaw application"
+
+    # SKILL.md
+    write_file(skill_dir / "SKILL.md", f"""---
+name: {skill_name}
+description: {skill_desc}
+user-invocable: true
+---
+
+# {title_case(skill_name)}
+
+## Overview
+
+This skill integrates the "{project_name}" web application with OpenClaw.
+
+It provides a simple interface for agents to interact with the app.
+
+## Usage
+
+When invoked, this skill will respond with a reference to the web app.
+
+Place this skill folder in your OpenClaw workspace `skills/` directory and restart the Gateway.
+
+""")
+    scripts_dir = skill_dir / "scripts"
+    ensure_dir(scripts_dir)
+    write_file(scripts_dir / "main.py", f'''#!/usr/bin/env python3
+"""
+{skill_name} - OpenClaw skill for {project_name}
+"""
+
+import sys
+import json
+
+def main():
+    # Simple echo skill; can be extended to call the web app's API
+    print(
+        "Thanks for using {project_name}! "
+        "Please open the web app for interactive features."
+    )
+
+if __name__ == "__main__":
+    main()
+''')
+    print("  Generated skill at skill/")
+
 def generate_nextjs(project_dir, project_name, desc, modules, config, state):
-    # package.json
     pkg = {
         "name": project_name,
         "version": "0.1.0",
         "private": True,
-        "scripts": {
-            "dev": "next dev",
-            "build": "next build",
-            "start": "next start",
-            "lint": "next lint",
-        },
+        "scripts": {"dev": "next dev", "build": "next build", "start": "next start", "lint": "next lint"},
         "dependencies": {"next": "14", "react": "^18", "react-dom": "^18"},
         "devDependencies": {"@types/node": "^20", "@types/react": "^18", "typescript": "^5"}
     }
@@ -119,11 +167,12 @@ export default function RootLayout({ children }) { return (<html lang="zh-CN"><b
         features_html = f"""
       <section>
         <h2>核心功能</h2>
-        <ul>{items}</ul>
+        <ul>
+          {items}
+        </ul>
       </section>
 """
-    # Connection guide section
-    skill_name = state["project"]["name"]
+
     connect_guide = f"""
       <section style={{ background: '#f6f8fa', padding: '1.5rem', borderRadius: '8px', marginTop: '2rem' }}>
         <h2>🔌 连接到 OpenClaw</h2>
@@ -169,7 +218,7 @@ export async function callOpenClaw(messages, agentId = 'main') {
   if (!response.ok) { const text = await response.text(); throw new Error(`OpenClaw API error: ${response.status} ${text}`); }
   return response.json();
 }
-export {{ callOpenClaw }};
+export { callOpenClaw };
 """)
 
     write_file(app_dir / "api" / "openclaw" / "route.ts", """import { NextResponse } from 'next/server';
@@ -274,30 +323,19 @@ cp -r skill/ ~/.openclaw/workspace/skills/
 ## 部署
 
 部署到 Vercel、Netlify 或任何 Node.js 主机时，请确保设置所需的环境变量。
+
 """
     write_file(project_dir / "README.md", readme)
 
 def generate_vite_react(project_dir, project_name, desc, modules, config):
-    # package.json for Vite + React + TypeScript
     pkg = {
         "name": project_name,
         "version": "0.1.0",
         "private": True,
         "type": "module",
-        "scripts": {
-            "dev": "vite",
-            "build": "tsc && vite build",
-            "preview": "vite preview",
-            "db:push": "prisma db push" if modules.get("database") != "none" else None
-        },
+        "scripts": {"dev": "vite", "build": "tsc && vite build", "preview": "vite preview", "db:push": "prisma db push" if modules.get("database") != "none" else None},
         "dependencies": {"react": "^18", "react-dom": "^18"},
-        "devDependencies": {
-            "typescript": "^5",
-            "@types/react": "^18",
-            "@types/react-dom": "^18",
-            "vite": "^5",
-            "@vitejs/plugin-react": "^4"
-        }
+        "devDependencies": {"typescript": "^5", "@types/react": "^18", "@types/react-dom": "^18", "vite": "^5", "@vitejs/plugin-react": "^4"}
     }
     if modules.get("database") == "postgresql":
         pkg["dependencies"]["prisma"] = "^5"
@@ -307,7 +345,6 @@ def generate_vite_react(project_dir, project_name, desc, modules, config):
         pkg["dependencies"]["@auth/react-query"] = "^0.18"
     write_file(project_dir / "package.json", json.dumps({k: v for k, v in pkg.items() if v is not None}, indent=2) + "\n")
 
-    # tsconfig.json for Vite
     write_file(project_dir / "tsconfig.json", """{
   "compilerOptions": {
     "target": "ES2020",
@@ -336,7 +373,6 @@ def generate_vite_react(project_dir, project_name, desc, modules, config):
 }
 """)
 
-    # vite.config.ts
     write_file(project_dir / "vite.config.ts", """import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 export default defineConfig({
@@ -346,7 +382,6 @@ export default defineConfig({
 });
 """)
 
-    # .env.local.example
     env = [
         "# OpenClaw Gateway",
         f"VITE_OPENCLAW_GATEWAY_URL={config.get('gateway_url') or 'http://localhost:18789'}",
@@ -359,7 +394,6 @@ export default defineConfig({
         env += ["# OAuth", "VITE_AUTH_REDIRECT_URI=http://localhost:3000/callback", "OAUTH_CLIENT_ID=your-client-id", "OAUTH_CLIENT_SECRET=your-client-secret"]
     write_file(project_dir / ".env.local.example", "\n".join(env) + "\n")
 
-    # src directory
     src_dir = project_dir / "src"
     ensure_dir(src_dir)
     write_file(src_dir / "main.tsx", """import React from 'react';
@@ -368,6 +402,7 @@ import App from './App';
 import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
 """)
+
     summary = state.get("prd", {}).get("summary", desc)
     features_list = state.get("prd", {}).get("features", [])
     features_html = ""
@@ -381,6 +416,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><
         </ul>
       </section>
 """
+
     connect_guide = f"""
       <section style={{ background: '#f6f8fa', padding: '1.5rem', borderRadius: '8px', marginTop: '2rem' }}>
         <h2>🔌 连接到 OpenClaw</h2>
@@ -525,20 +561,24 @@ def main():
     else:
         generate_vite_react(project_dir, project_name, proj.get("description", "OpenClaw 项目"), modules, config)
 
+    # Generate accompanying skill
+    print("生成配套 Skill...")
+    generate_skill(project_dir, project_name, proj.get("description", "OpenClaw 项目"), state)
+
     state["stage"] = "ready"
     save_state(root, state)
 
     print("\\n✅ 项目已生成！")
     print(f"\\n项目目录: {project_dir}")
+    print("包含:")
+    print("  - web/    (部署的 Web 应用)")
+    print("  - skill/  (OpenClaw skill 安装包)")
     print("启动步骤:")
     print("1. cd " + str(project_name))
-    print("2. npm install")
-    if tech == "nextjs":
-        print("3. cp .env.local.example .env.local && 编辑")
-        print("4. npm run dev")
-    else:
-        print("3. cp .env.local.example .env.local && 编辑")
-        print("4. npm run dev")
+    print("2. 安装 web 依赖: (在 web/ 或根目录，根据生成结构)")
+    print("3. 配置 .env.local (Gateway URL)")
+    print("4. 将 skill/ 复制到 OpenClaw workspace/skills/ 并启用")
+    print("5. 运行 web 应用: npm run dev")
     print("\\n访问: http://localhost:3000\\n")
 
 if __name__ == "__main__":
