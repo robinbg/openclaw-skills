@@ -17,14 +17,14 @@
 ### 通过 skills.sh 安装（推荐）
 
 ```bash
-npx skills add openclaw/openclaw-skills
+npx skills add robinbg/openclaw-skills
 ```
 
 或直接克隆到 OpenClaw 工作区的 `skills/` 目录：
 
 ```bash
 cd ~/.openclaw/workspace/skills
-git clone https://github.com/<your-org>/openclaw-skills.git
+git clone https://github.com/robinbg/openclaw-skills.git
 ```
 
 或手动复制整个 `skills/` 子目录到你的 workspace 中。
